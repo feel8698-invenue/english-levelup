@@ -25,3 +25,11 @@
 | `sw.js`, `manifest.webmanifest`, `icons/` | 홈 화면 설치와 오프라인 사용 |
 
 빌드 과정이 없는 정적 파일이라 GitHub Pages에 그대로 올리면 됩니다.
+
+## 아티팩트 버전 (API 키 없이 Claude 채점)
+
+`artifact/english-levelup.html`은 Claude 아티팩트로 여는 버전입니다. 로그인한 Claude 계정으로 채점하므로 API 키와 추가 요금이 없고, 기록은 Claude 계정에 저장됩니다. Claude 앱이나 claude.ai 안에서만 동작하며, GitHub Pages에서 열면 Claude 채점 없이 동작합니다.
+
+- 앱 버전과의 차이: 앱 안 마이크를 쓸 수 없어 말하기는 키보드 받아쓰기로 입력합니다.
+- 다시 만들기: 저장소 루트에서 `python3 artifact/build.py . artifact artifact/english-levelup.html`
+  (`bank.js`, `speech.js`는 앱과 같이 쓰고, `artifact/app.js`, `artifact/ai-sample.js`는 아티팩트용입니다.)
