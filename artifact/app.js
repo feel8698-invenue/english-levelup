@@ -153,7 +153,7 @@ async function grade(item, sess) {
   const key = state.settings.key, lv = sess.level;
   try {
     if (item.t === "W") {
-      if (key) {
+      if (hasKey()) {
         const r = await (await ai()).gradeWriting(key, lv, item, item.mine);
         item.res = { ...r, score: scoreOf(r.verdict) };
       } else {
