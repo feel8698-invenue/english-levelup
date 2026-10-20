@@ -62,10 +62,13 @@ async function connect() {
         wrongCol = profileRef.collection("wrong");
         const [p, hs, ws] = await Promise.all([profileRef.get(), histCol.get(), wrongCol.get()]);
         if (p.exists) {
-          const history = hs.docs.map(d => d.data()).sort((a, b) => a.id < b.id ? -1 : 1);
-          const wrong = ws.docs.map(d => d.data()).sort((a, b) => (a.date || "") < (b.date || "") ? -1 : 1);
+          // snapshots arrive frozen; the app edits state in place, so work on copies
+          const copy = d => structuredClone(d.data());
+          const history = hs.docs.map(copy).sort((a, b) => a.id < b.id ? -1 : 1);
+          const wrong = ws.docs.map(copy).sort((a, b) => (a.date || "") < (b.date || "") ? -1 : 1);
           hs.docs.forEach(d => syncedHist.add(d.id)); ws.docs.forEach(d => syncedWrong.add(d.id));
-          state = { ...fresh(), ...p.data(), history, wrong };
+          const prof = copy(p);
+          state = { ...fresh(), ...prof, settings: { ...fresh().settings, ...prof.settings }, history, wrong };
           try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {}
         } else await syncAll(); // first open in this account: carry over what this browser has
       }
