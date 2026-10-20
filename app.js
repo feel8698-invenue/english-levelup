@@ -7,11 +7,12 @@ const ai = () => import("./ai.js");
 const LV = LEVELS.map(l => l.id);
 const XP_PER_LEVEL = 300;
 const MISSIONS = [
-  { key: "W", name: "쓰기 · 순간영작", n: 5, mins: 5 },
-  { key: "S", name: "듣고 말하기", n: 5, mins: 10 },
+  { key: "W", name: "쓰기 · 순간영작", n: 15, mins: 15 },
+  { key: "S", name: "듣고 말하기", n: 15, mins: 30 },
   { key: "X", name: "오답 복습", n: 3, mins: 5 },
 ];
 const TYPE_NAME = { W: "쓰기", L: "듣기", R: "따라 말하기", Q: "듣고 대답하기", O: "의견 말하기" };
+const SET_N = 15; // questions per practice set
 const KIND_NAME = { test: "레벨 테스트", write: "쓰기 연습", speak: "듣고 말하기", review: "오답 복습" };
 
 // ---------- state ----------
@@ -95,6 +96,13 @@ function fromGenerated(level, g) {
   ["Q", "O"].forEach(t => g[t].forEach((x, i) => out.push({ t, id: `ai:${stamp}:${t}${i}`, level, prompt: x.prompt, hint: x.hint, sample: x.sample })));
   return out;
 }
+// A level's bank can be smaller than a set (8 read-aloud sentences), so top up from the nearest levels
+function pickFill(level, t, n) {
+  const i = LV.indexOf(level), near = [level, LV[i - 1], LV[i + 1], LV[i - 2], LV[i + 2]].filter(Boolean);
+  const out = [];
+  for (const l of near) if (out.length < n) out.push(...pick(l, t, n - out.length));
+  return out;
+}
 function testFromBank(level) {
   return Object.entries(TEST_PLAN).flatMap(([t, n]) => pick(level, t, n));
 }
@@ -144,9 +152,9 @@ function startSession(kind, opts = {}) {
   const level = opts.level || state.level;
   let items = opts.items;
   if (!items) {
-    if (kind === "write") items = pick(level, "W", 5);
-    else if (kind === "speak") items = opts.mode === "Q" ? [...pick(level, "Q", 4), ...pick(level, "O", 1)] : pick(level, "R", 5);
-    else if (kind === "review") items = state.wrong.slice().sort(() => Math.random() - .5).slice(0, 5).map(w => ({ ...w.item, fromWrong: true }));
+    if (kind === "write") items = pickFill(level, "W", SET_N);
+    else if (kind === "speak") items = opts.mode === "Q" ? [...pickFill(level, "Q", SET_N - 3), ...pickFill(level, "O", 3)] : pickFill(level, "R", SET_N);
+    else if (kind === "review") items = state.wrong.slice().sort(() => Math.random() - .5).slice(0, SET_N).map(w => ({ ...w.item, fromWrong: true }));
     else if (kind === "test") items = testFromBank(level);
   }
   items = items.map(it => ({ ...it, mine: "", res: null, choice: null, self: null, fromWrong: it.fromWrong }));
@@ -309,7 +317,7 @@ const VIEWS = {
       <span class="small" style="color:var(--hero-muted)">${sec ? `${shortDate(sec.date)} ${sec.level} 테스트 영역 점수` : esc(state.levelNote)}</span>
     </section>
     <section class="stack" aria-label="오늘의 미션">
-      <div class="between"><h2>오늘의 미션</h2><span class="small muted">${doneN} / 3 완료 · 약 20분</span></div>
+      <div class="between"><h2>오늘의 미션</h2><span class="small muted">${doneN} / 3 완료 · 약 ${MISSIONS.reduce((a, m) => a + m.mins, 0)}분</span></div>
       ${MISSIONS.map(m => {
         const n = today[m.key] || 0, done = n >= m.n, isNext = nextM === m, empty = m.key === "X" && !state.wrong.length;
         const ic = done ? `<span class="ic done">${ICON.check}</span>` : m.key === "S" ? `<span class="ic sp">${ICON.mic}</span>` : m.key === "W" ? `<span class="ic">${ICON.pen}</span>` : `<span class="ic">${ICON.redo}</span>`;
@@ -325,10 +333,10 @@ const VIEWS = {
     return `
     <h1>연습</h1>
     <p class="muted">지금 레벨(${state.level}) 문제가 나와요. 레벨은 설정에서 바꿀 수 있어요.</p>
-    <button class="mission" data-act="start" data-kind="write"><span class="ic">${ICON.pen}</span><span class="stack" style="gap:0"><span class="t">쓰기 · 순간영작</span><span class="small muted">한국어를 보고 2~3초 안에 영어로 · 5문장</span></span></button>
-    <button class="mission" data-act="start" data-kind="speak" data-mode="R"><span class="ic sp">${ICON.mic}</span><span class="stack" style="gap:0"><span class="t">따라 말하기</span><span class="small muted">원어민 문장을 듣고 소리 내어 읽기 · 5문장</span></span></button>
-    <button class="mission" data-act="start" data-kind="speak" data-mode="Q"><span class="ic sp">${ICON.sound}</span><span class="stack" style="gap:0"><span class="t">듣고 대답하기</span><span class="small muted">영어 질문을 듣고 말로 답하기 · 5문제</span></span></button>
-    <button class="mission" data-act="start" data-kind="review" ${state.wrong.length ? "" : "disabled"}><span class="ic">${ICON.redo}</span><span class="stack" style="gap:0"><span class="t">오답 복습</span><span class="small muted">${state.wrong.length ? `오답노트 ${state.wrong.length}문장 중 5개` : "틀린 문장이 아직 없어요"}</span></span></button>
+    <button class="mission" data-act="start" data-kind="write"><span class="ic">${ICON.pen}</span><span class="stack" style="gap:0"><span class="t">쓰기 · 순간영작</span><span class="small muted">한국어를 보고 2~3초 안에 영어로 · ${SET_N}문장</span></span></button>
+    <button class="mission" data-act="start" data-kind="speak" data-mode="R"><span class="ic sp">${ICON.mic}</span><span class="stack" style="gap:0"><span class="t">따라 말하기</span><span class="small muted">원어민 문장을 듣고 소리 내어 읽기 · ${SET_N}문장</span></span></button>
+    <button class="mission" data-act="start" data-kind="speak" data-mode="Q"><span class="ic sp">${ICON.sound}</span><span class="stack" style="gap:0"><span class="t">듣고 대답하기</span><span class="small muted">영어 질문을 듣고 말로 답하기 · ${SET_N}문제</span></span></button>
+    <button class="mission" data-act="start" data-kind="review" ${state.wrong.length ? "" : "disabled"}><span class="ic">${ICON.redo}</span><span class="stack" style="gap:0"><span class="t">오답 복습</span><span class="small muted">${state.wrong.length ? `오답노트 ${state.wrong.length}문장 중 ${Math.min(SET_N, state.wrong.length)}개` : "틀린 문장이 아직 없어요"}</span></span></button>
     ${!SP.canListen() ? `<div class="warn">이 브라우저에서는 앱 안 마이크 인식이 안 돼요. 말하기 문제는 <b>키보드의 마이크 버튼</b>(받아쓰기)으로 말해서 입력하면 돼요.</div>` : ""}`;
   },
 
