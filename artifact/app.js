@@ -79,7 +79,7 @@ async function connect() {
 
 // ---------- ui state (not saved) ----------
 const ui = { view: "home", session: null, rec: null, draft: "", plays: 0, rate: 1, showText: false, askOpen: null, askBusy: false,
-  testTarget: null, testSource: "bank", histFilter: "all", detail: null, confirmReset: false, keyStatus: "" };
+  testTarget: null, testSource: null, histFilter: "all", detail: null, confirmReset: false, keyStatus: "" };
 
 // ---------- helpers ----------
 const $ = s => document.querySelector(s);
@@ -147,6 +147,11 @@ function pickFill(level, t, n) {
   const out = [];
   for (const l of near) if (out.length < n) out.push(...pick(l, t, n - out.length));
   return out;
+}
+// Retaking a level gets fresh Claude-written questions for it; the first try uses the bank
+function testSourceFor(level) {
+  if (!hasKey()) return "bank";
+  return ui.testSource || (state.history.some(h => h.kind === "test" && h.level === level) ? "ai" : "bank");
 }
 function testFromBank(level) {
   return Object.entries(TEST_PLAN).flatMap(([t, n]) => pick(level, t, n));
@@ -389,6 +394,7 @@ const VIEWS = {
   test() {
     const target = ui.testTarget || (state.level === "C1" ? "C1" : nextLv(state.level));
     const tests = state.history.filter(h => h.kind === "test");
+    const src = testSourceFor(target), retake = tests.some(h => h.level === target);
     return `
     <h1>레벨 테스트</h1>
     <section class="card lift">
@@ -396,9 +402,9 @@ const VIEWS = {
         <div class="row">${LV.map(l => `<button class="chip" data-act="target" data-l="${l}" aria-pressed="${l === target}">${l}</button>`).join("")}</div>
         <span class="small muted">${target} ${lvInfo(target).ko}: ${lvInfo(target).can}</span></div>
       <div class="stack" style="gap:4px"><span class="label">문제</span>
-        <div class="row"><button class="chip" data-act="source" data-s="bank" aria-pressed="${ui.testSource === "bank"}">문제 은행</button>
-        <button class="chip" data-act="source" data-s="ai" aria-pressed="${ui.testSource === "ai"}" ${hasKey() ? "" : "disabled"}>Claude가 새로 출제</button></div>
-        <span class="small muted">${ui.testSource === "ai" ? "매번 처음 보는 문제를 레벨 기준에 맞춰 새로 만들어요." : `레벨마다 쓰기 15 · 듣기 10 · 말하기 21문항 중에서 안 본 문제부터 나와요.`}</span></div>
+        <div class="row"><button class="chip" data-act="source" data-s="bank" aria-pressed="${src === "bank"}">문제 은행</button>
+        <button class="chip" data-act="source" data-s="ai" aria-pressed="${src === "ai"}" ${hasKey() ? "" : "disabled"}>Claude가 새로 출제</button></div>
+        <span class="small muted">${src === "ai" ? (retake && !ui.testSource ? `${target}을(를) 다시 보는 거라 Claude가 이 레벨에 맞춰 처음 보는 문제를 새로 만들어요.` : "매번 처음 보는 문제를 레벨 기준에 맞춰 새로 만들어요.") : retake && !hasKey() ? "다시 볼 때 새 문제를 받으려면 Claude 채점을 연결해 주세요. 지금은 안 본 문제부터 나와요." : `레벨마다 쓰기 15 · 듣기 10 · 말하기 21문항 중에서 안 본 문제부터 나와요.`}</span></div>
       <div class="note"><b>15문항 · 약 15분</b><br>쓰기 5 · 듣기 5 · 말하기 5 (따라 읽기 2, 질문에 답하기 2, 의견 말하기 1)<br>세 영역이 모두 <b>${PASS_SCORE}점 이상</b>이면 ${target} 합격, 레벨이 올라가요.</div>
       <button class="btn wide" data-act="start-test" data-l="${target}">${target} 테스트 시작</button>
       <p class="small muted">CEFR 기준과 공인 말하기 시험(토익스피킹 · OPIc · 캠브리지)의 문제 유형을 따랐어요. 연습용 판정이라 공식 성적은 아니에요.</p>
@@ -684,14 +690,14 @@ document.addEventListener("click", async e => {
     }
     case "start": startSession(b.dataset.kind, { mode: b.dataset.mode }); break;
     case "again": startSession(s.kind, { mode: s.mode }); break;
-    case "target": ui.testTarget = b.dataset.l; render(); break;
+    case "target": ui.testTarget = b.dataset.l; ui.testSource = null; render(); break;
     case "source": ui.testSource = b.dataset.s; render(); break;
     case "start-test": {
       const lv = b.dataset.l;
-      if (ui.testSource === "ai" && hasKey()) {
+      if (testSourceFor(lv) === "ai") {
         b.disabled = true; b.textContent = "Claude가 문제를 만들고 있어요…";
         try {
-          const avoid = state.history.filter(h => h.kind === "test" && h.items).flatMap(h => h.items.map(i => i.prompt));
+          const avoid = state.history.filter(h => h.kind === "test" && h.items).reverse().flatMap(h => h.items.map(i => i.prompt));
           const g = await (await ai()).generateTest(state.settings.key, lv, TEST_PLAN, avoid);
           startSession("test", { level: lv, items: fromGenerated(lv, g), source: "ai" });
         } catch (err) { toast(`${err.message} 문제 은행으로 시작할게요.`); startSession("test", { level: lv }); }
