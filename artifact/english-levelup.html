@@ -876,6 +876,7 @@ function resetCard() { stopRec(); ui.draft = ""; ui.plays = 0; ui.showText = fal
 
 function submitCurrent(value) {
   const s = ui.session, item = s.items[s.i];
+  if (item.t !== "L" && HANGUL.test(value || "")) { toast("한글이 섞여 있어요. English 키보드로 바꿔서 다시 말해 주세요."); return; }
   if (item.t === "L") item.choice = value;
   else item.mine = String(value ?? "").trim();
   if ((item.t === "Q" || item.t === "O") && !hasKey() && item.self == null) { ui.selfStep = true; render(); return; }
@@ -1044,7 +1045,7 @@ const VIEWS = {
     <button class="mission" data-act="start" data-kind="speak" data-mode="R"><span class="ic sp">${ICON.mic}</span><span class="stack" style="gap:0"><span class="t">따라 말하기</span><span class="small muted">원어민 문장을 듣고 소리 내어 읽기 · ${SET_N}문장</span></span></button>
     <button class="mission" data-act="start" data-kind="speak" data-mode="Q"><span class="ic sp">${ICON.sound}</span><span class="stack" style="gap:0"><span class="t">듣고 대답하기</span><span class="small muted">영어 질문을 듣고 말로 답하기 · ${SET_N}문제</span></span></button>
     <button class="mission" data-act="start" data-kind="review" ${state.wrong.length ? "" : "disabled"}><span class="ic">${ICON.redo}</span><span class="stack" style="gap:0"><span class="t">오답 복습</span><span class="small muted">${state.wrong.length ? `오답노트 ${state.wrong.length}문장 중 ${Math.min(SET_N, state.wrong.length)}개` : "틀린 문장이 아직 없어요"}</span></span></button>
-    ${!SP.canListen() ? `<div class="warn">이 브라우저에서는 앱 안 마이크 인식이 안 돼요. 말하기 문제는 <b>키보드의 마이크 버튼</b>(받아쓰기)으로 말해서 입력하면 돼요.</div>` : ""}`;
+    ${!SP.canListen() ? `<div class="warn">이 브라우저에서는 앱 안 마이크 인식이 안 돼요. 말하기 문제는 키보드를 <b>English</b>로 바꾸고 <b>키보드의 마이크 버튼</b>(받아쓰기)으로 말해서 입력하면 돼요. 한글 키보드에서는 영어도 한글로 받아 적어요.</div>` : ""}`;
   },
 
   test() {
@@ -1110,7 +1111,7 @@ const VIEWS = {
       <div class="row"><span class="small" style="width:56px">발음</span><button class="chip" data-act="accent" data-a="US" aria-pressed="${k.accent === "US"}">미국</button><button class="chip" data-act="accent" data-a="GB" aria-pressed="${k.accent === "GB"}">영국</button></div>
       <div class="row"><span class="small" style="width:56px">속도</span>${[[0.75, "느리게"], [1, "보통"]].map(([r, n]) => `<button class="chip" data-act="rate" data-r="${r}" aria-pressed="${k.rate === r}">${n}</button>`).join("")}</div>
       <button class="btn ghost" data-act="testvoice">${ICON.sound} 목소리 들어 보기</button>
-      <p class="small muted">말하기 문제는 키보드의 마이크 버튼(받아쓰기)을 누르고 영어로 말해서 입력해요.</p>
+      <p class="small muted">말하기 문제는 키보드를 English로 바꾸고 마이크 버튼(받아쓰기)을 누른 뒤 영어로 말해서 입력해요. 한글 키보드에서는 영어도 한글로 받아 적어요.</p>
     </section>
     <section class="card">
       <h2>기록</h2>
@@ -1149,11 +1150,14 @@ function sessionView() {
   ${s.kind !== "test" && s.i > 0 ? `<section class="stack" style="gap:6px"><span class="label">방금 문제</span><div class="card" id="lastfb"></div></section>` : ""}`;
 }
 
-const answerBox = (placeholder, readonly) => `<textarea id="answer" rows="2" autocomplete="off" autocapitalize="sentences" spellcheck="false" placeholder="${placeholder}" ${readonly ? "readonly" : ""}></textarea>`;
+// iOS dictation follows the keyboard language, so a Korean keyboard turns spoken English into Hangul
+const HANGUL = /[\u1100-\u11FF\u3130-\u318F\uAC00-\uD7AF]/;
+const answerBox = (placeholder, readonly) => `<textarea id="answer" lang="en" rows="2" autocomplete="off" autocapitalize="sentences" spellcheck="false" placeholder="${placeholder}" ${readonly ? "readonly" : ""}></textarea>
+  <p id="kowarn" class="warn" ${HANGUL.test(ui.draft) ? "" : "hidden"}>키보드가 한글이면 영어 발음도 한글로 받아 적어요. 지구본 버튼으로 <b>English 키보드</b>로 바꾼 뒤 마이크를 눌러 주세요.</p>`;
 
 function micBlock(label) {
   const r = ui.rec, on = r?.active;
-  if (!SP.canListen()) return `<p class="small muted">키보드의 마이크 버튼을 누르고 영어로 말하면 아래 칸에 입력돼요.</p>${answerBox("여기에 말하거나 써서 입력")}`;
+  if (!SP.canListen()) return `<p class="small muted">키보드를 <b>English</b>로 바꾸고 마이크 버튼을 누른 뒤 영어로 말하면 아래 칸에 입력돼요.</p>${answerBox("여기에 말하거나 써서 입력")}`;
   return `
   <div class="stack" style="align-items:center;gap:8px">
     <button class="mic ${on ? "on" : ""}" data-act="mic" aria-label="${on ? "녹음 멈추기" : label}">${on ? ICON.stop : ICON.micBig}</button>
@@ -1328,7 +1332,7 @@ async function ask(q) {
 }
 
 // ---------- events ----------
-document.addEventListener("input", e => { if (e.target.id === "answer") { ui.draft = e.target.value; const b = document.querySelector('[data-act="submit"]'); if (b) b.disabled = false; } });
+document.addEventListener("input", e => { if (e.target.id === "answer") { ui.draft = e.target.value; const w = $("#kowarn"); if (w) w.hidden = !HANGUL.test(ui.draft); const b = document.querySelector('[data-act="submit"]'); if (b) b.disabled = false; } });
 document.addEventListener("keydown", e => {
   if (e.target.id === "answer" && e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); submitCurrent(e.target.value); }
 });
