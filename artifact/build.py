@@ -1,7 +1,6 @@
 # Assembles the single-file artifact page from the app sources plus the artifact-only pieces.
 import re, sys
 repo, here, out = sys.argv[1], sys.argv[2], sys.argv[3]
-bank = open(f"{repo}/bank.js").read().replace("export const", "const")
 speech = open(f"{repo}/speech.js").read().replace("export function", "function")
 # the artifact frame refuses the microphone, so answers come from keyboard dictation
 speech = speech.replace("export function canListen() { return !!Recognition; }", "")
@@ -27,7 +26,6 @@ html = f"""<title>영어 레벨업</title>
 <nav id="tabs" class="tabs" aria-label="메뉴"></nav>
 <div id="toast" class="toast" role="status" hidden></div>
 <script type="module">
-{bank}
 {speech}
 {ai}
 {app}
