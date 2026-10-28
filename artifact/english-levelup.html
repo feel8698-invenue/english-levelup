@@ -141,6 +141,12 @@ textarea:focus,input:focus{border-color:var(--accent);outline:none;box-shadow:0 
 .bubble.me.en{font-size:15.5px}
 .corr{align-self:flex-end;max-width:92%;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
 .corr.ok{color:var(--ok);border:0;background:none;padding:0 4px}
+.term{background:var(--accent-soft);color:inherit;border-radius:4px;padding:0 2px;text-decoration:underline dotted var(--accent);text-decoration-thickness:2px;text-underline-offset:3px}
+button.term{font-family:var(--f-en);font-size:14.5px;font-weight:500;border:0;cursor:pointer;flex-shrink:0}
+.vocab{display:flex;flex-direction:column;gap:6px;margin-top:10px;padding-top:8px;border-top:1px dashed var(--line);font-family:var(--f-body)}
+.vrow{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;font-size:14px;line-height:1.45}
+.vko{min-width:0;overflow-wrap:anywhere}
+.corr .vocab{margin-top:0;padding-top:0;border-top:0}
 [hidden]{display:none!important}
 
 </style>
@@ -230,16 +236,19 @@ const AI = (() => {
   const question = r => {
     const next = str(r?.next);
     if (!next) throw Object.assign(new Error("Claude가 다음 질문을 만들지 못했어요. 다시 보내 주세요."), { code: "bad_output" });
-    return { next, ko: str(r?.ko), hint: str(r?.hint) };
+    return { next, ko: str(r?.ko), hint: str(r?.hint), words: words(r?.words) };
   };
+  // idioms and vocabulary to annotate: [{en, ko, note}]
+  const words = v => (Array.isArray(v) ? v : []).map(w => ({ en: str(w?.en), ko: str(w?.ko), note: str(w?.note) })).filter(w => w.en && w.ko).slice(0, 5);
 
   return {
     async startChat(level, avoid) {
       const r = await askJSON(
 `CEFR ${level} 학습자와 영어로 꼬리물기 대화를 시작합니다. 학습자의 일상, 경험, 일, 취미, 생각 가운데 하나를 골라 답하기 쉬운 열린 질문 하나로 시작하세요.
 최근에 이야기한 주제는 피하세요: ${avoid.join(", ") || "(없음)"}
-topic: 고른 주제를 한국어 2~5단어로. next: 첫 질문(영어, 레벨 ${level}에 맞는 어휘와 길이). ko: next의 한국어 뜻. hint: 레벨 ${level} 학습자가 할 만한 영어 답변 예시 1~2문장.`,
-        `{"topic":"","next":"","ko":"","hint":""}`);
+topic: 고른 주제를 한국어 2~5단어로. next: 첫 질문(영어, 레벨 ${level}에 맞는 어휘와 길이). ko: next의 한국어 뜻. hint: 레벨 ${level} 학습자가 할 만한 영어 답변 예시 1~2문장.
+words: next에 나온 숙어, 구동사, 연어나 레벨 ${level} 학습자가 익혀 둘 만한 단어 1~3개. en은 문장에 나온 그대로의 표현, ko는 이 문맥에서의 한국어 뜻, note는 쓰임이나 비슷한 표현을 한국어 한 줄로. I, go, like처럼 레벨에 비해 너무 쉬운 단어는 빼세요.`,
+        `{"topic":"","next":"","ko":"","hint":"","words":[{"en":"","ko":"","note":""}]}`);
       return { topic: str(r?.topic) || "자유 대화", ...question(r) };
     },
 
@@ -260,10 +269,11 @@ fix: 학습자 답을 같은 뜻으로 최소한만 고친 자연스러운 영�
 - 학습자가 질문을 했다면 방금 한 내 대답과 연결해서 다시 학습자에게 묻습니다(예: 내 경험을 말한 뒤 "How about you? ..."처럼 같은 화제로).
 - 아니면 학습자가 방금 말한 내용에서 꼬리를 물어 더 깊이 들어갑니다(왜, 어떻게, 언제, 누구와, 그때 기분, 비교, 앞으로의 계획 등).
 - 이미 물은 것은 다시 묻지 말고, 같은 방향으로 대여섯 번 이어졌으면 관련된 옆 이야기로 자연스럽게 넘어가세요. 학습자가 답을 못 했으면 더 쉬운 질문으로 바꾸세요. 레벨 ${level}에 맞는 어휘와 길이로.
-ko: reply와 next의 한국어 뜻. hint: next에 대한 레벨 ${level} 영어 답변 예시 1~2문장.`,
-        `{"verdict":"ok|minor|wrong|skip","fix":"","tip":"","reply":"","next":"","ko":"","hint":""}`);
+ko: reply와 next의 한국어 뜻. hint: next에 대한 레벨 ${level} 영어 답변 예시 1~2문장.
+4) 공부용 표현 해설. words: reply와 next에 나온 숙어, 구동사, 연어나 레벨 ${level} 학습자가 익혀 둘 만한 단어 2~4개. mywords: 학습자 답과 고친 문장(fix)에 나온 표현 가운데 익혀 둘 만한 숙어나 단어 0~3개(고친 부분의 표현을 우선). en은 문장에 나온 그대로의 표현, ko는 이 문맥에서의 한국어 뜻, note는 쓰임이나 비슷한 표현을 한국어 한 줄로. I, go, like처럼 레벨에 비해 너무 쉬운 단어는 빼세요.`,
+        `{"verdict":"ok|minor|wrong|skip","fix":"","tip":"","reply":"","next":"","ko":"","hint":"","words":[{"en":"","ko":"","note":""}],"mywords":[{"en":"","ko":"","note":""}]}`);
       const verdict = !answer ? "skip" : VERDICTS.includes(r?.verdict) ? r.verdict : "minor";
-      return { verdict, fix: str(r?.fix), tip: str(r?.tip), reply: str(r?.reply), ...question(r) };
+      return { verdict, fix: str(r?.fix), tip: str(r?.tip), reply: str(r?.reply), mywords: words(r?.mywords), ...question(r) };
     },
 
     async askAbout(item, history) {
@@ -410,7 +420,7 @@ async function startChat() {
   try {
     const avoid = state.history.filter(h => h.kind === "chat").slice(-8).map(h => h.topic);
     const r = await AI.startChat(state.level, avoid);
-    state.chat = { id: String(Date.now()), level: state.level, topic: r.topic, turns: [{ q: r.next, ko: r.ko, hint: r.hint }] };
+    state.chat = { id: String(Date.now()), level: state.level, topic: r.topic, turns: [{ q: r.next, ko: r.ko, hint: r.hint, words: r.words }] };
     save();
     ui.busy = false; render(); say(r.next);
   } catch (e) { ui.busy = false; ui.view = "home"; render(); toast(e.message); }
@@ -425,8 +435,8 @@ async function sendAnswer(text) {
   turn.a = text; ui.draft = ""; ui.hint = false; ui.busy = true; render();
   try {
     const r = await AI.chatTurn(chat.level, chat.topic, chat.turns, text);
-    Object.assign(turn, { verdict: r.verdict, fix: r.fix, tip: r.tip });
-    chat.turns.push({ reply: r.reply, q: r.next, ko: r.ko, hint: r.hint });
+    Object.assign(turn, { verdict: r.verdict, fix: r.fix, tip: r.tip, mywords: r.mywords });
+    chat.turns.push({ reply: r.reply, q: r.next, ko: r.ko, hint: r.hint, words: r.words });
     record(chat, turn);
     ui.busy = false; save(); render(); say(`${r.reply} ${r.next}`);
   } catch (e) {
@@ -454,7 +464,7 @@ function endChat(show = true) {
   state.chat = null;
   if (turns.length) {
     const entry = { id: chat.id, date: day(d), time: `${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`, kind: "chat",
-      level: chat.level, topic: chat.topic, turns: turns.map(({ q, ko, reply, a, verdict, fix, tip }) => ({ q, ko, reply, a, verdict, fix, tip })) };
+      level: chat.level, topic: chat.topic, turns: turns.map(({ q, ko, reply, a, verdict, fix, tip, words, mywords }) => ({ q, ko, reply, a, verdict, fix, tip, words, mywords })) };
     state.history.push(entry);
     state.history = state.history.slice(-200);
     if (show) ui.summary = entry;
@@ -612,7 +622,7 @@ const VIEWS = {
 // One exchange: Claude's reaction + question, then my answer and its correction
 function turnView(t, key, live) {
   const open = ui.ko.has(key);
-  const coach = `${t.reply ? `${esc(t.reply)} ` : ""}<b>${esc(t.q)}</b>`;
+  const coach = `${t.reply ? `${hl(t.reply, t.words)} ` : ""}<b>${hl(t.q, t.words)}</b>`;
   return `
   <div class="bubble ai coach en">${coach}
     <div class="row" style="margin-top:6px;gap:6px">
@@ -620,8 +630,25 @@ function turnView(t, key, live) {
       ${t.ko ? `<button class="chip" data-act="ko" data-k="${key}" aria-pressed="${open}">뜻</button>` : ""}
     </div>
     ${open ? `<p class="small" style="font-family:var(--f-body);margin-top:6px">${esc(t.ko)}</p>` : ""}
+    ${vocabView(t.words)}
   </div>
-  ${t.a != null ? `<div class="bubble me en">${esc(t.a || "(모르겠어요)")}</div>${t.verdict ? corrView(t) : ""}` : ""}`;
+  ${t.a != null ? `<div class="bubble me en">${hl(t.a || "(모르겠어요)", t.mywords)}</div>${t.verdict ? corrView(t) : ""}${t.mywords?.length ? `<div class="corr">${vocabView(t.mywords)}</div>` : ""}` : ""}`;
+}
+
+// Underline the annotated idioms and words inside a sentence (longest first, case-insensitive)
+function hl(text, words) {
+  const list = (words || []).map(w => w.en).filter(Boolean).sort((a, b) => b.length - a.length);
+  if (!list.length) return esc(text);
+  const re = new RegExp(list.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"), "gi");
+  let out = "", at = 0;
+  for (const m of String(text).matchAll(re)) { out += esc(text.slice(at, m.index)) + `<span class="term">${esc(m[0])}</span>`; at = m.index + m[0].length; }
+  return out + esc(text.slice(at));
+}
+function vocabView(words) {
+  if (!words?.length) return "";
+  return `<div class="vocab"><span class="label">단어 · 숙어</span>${words.map(w => `
+    <div class="vrow"><button class="term" data-act="say" data-text="${esc(w.en)}">${esc(w.en)}</button>
+      <span class="vko">${esc(w.ko)}${w.note ? `<span class="muted"> · ${esc(w.note)}</span>` : ""}</span></div>`).join("")}</div>`;
 }
 function corrView(t) {
   if (t.verdict === "ok") return `<p class="corr ok small">○ 자연스러워요</p>`;

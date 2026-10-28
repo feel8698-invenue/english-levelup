@@ -21,16 +21,19 @@ const AI = (() => {
   const question = r => {
     const next = str(r?.next);
     if (!next) throw Object.assign(new Error("Claude가 다음 질문을 만들지 못했어요. 다시 보내 주세요."), { code: "bad_output" });
-    return { next, ko: str(r?.ko), hint: str(r?.hint) };
+    return { next, ko: str(r?.ko), hint: str(r?.hint), words: words(r?.words) };
   };
+  // idioms and vocabulary to annotate: [{en, ko, note}]
+  const words = v => (Array.isArray(v) ? v : []).map(w => ({ en: str(w?.en), ko: str(w?.ko), note: str(w?.note) })).filter(w => w.en && w.ko).slice(0, 5);
 
   return {
     async startChat(level, avoid) {
       const r = await askJSON(
 `CEFR ${level} 학습자와 영어로 꼬리물기 대화를 시작합니다. 학습자의 일상, 경험, 일, 취미, 생각 가운데 하나를 골라 답하기 쉬운 열린 질문 하나로 시작하세요.
 최근에 이야기한 주제는 피하세요: ${avoid.join(", ") || "(없음)"}
-topic: 고른 주제를 한국어 2~5단어로. next: 첫 질문(영어, 레벨 ${level}에 맞는 어휘와 길이). ko: next의 한국어 뜻. hint: 레벨 ${level} 학습자가 할 만한 영어 답변 예시 1~2문장.`,
-        `{"topic":"","next":"","ko":"","hint":""}`);
+topic: 고른 주제를 한국어 2~5단어로. next: 첫 질문(영어, 레벨 ${level}에 맞는 어휘와 길이). ko: next의 한국어 뜻. hint: 레벨 ${level} 학습자가 할 만한 영어 답변 예시 1~2문장.
+words: next에 나온 숙어, 구동사, 연어나 레벨 ${level} 학습자가 익혀 둘 만한 단어 1~3개. en은 문장에 나온 그대로의 표현, ko는 이 문맥에서의 한국어 뜻, note는 쓰임이나 비슷한 표현을 한국어 한 줄로. I, go, like처럼 레벨에 비해 너무 쉬운 단어는 빼세요.`,
+        `{"topic":"","next":"","ko":"","hint":"","words":[{"en":"","ko":"","note":""}]}`);
       return { topic: str(r?.topic) || "자유 대화", ...question(r) };
     },
 
@@ -51,10 +54,11 @@ fix: 학습자 답을 같은 뜻으로 최소한만 고친 자연스러운 영�
 - 학습자가 질문을 했다면 방금 한 내 대답과 연결해서 다시 학습자에게 묻습니다(예: 내 경험을 말한 뒤 "How about you? ..."처럼 같은 화제로).
 - 아니면 학습자가 방금 말한 내용에서 꼬리를 물어 더 깊이 들어갑니다(왜, 어떻게, 언제, 누구와, 그때 기분, 비교, 앞으로의 계획 등).
 - 이미 물은 것은 다시 묻지 말고, 같은 방향으로 대여섯 번 이어졌으면 관련된 옆 이야기로 자연스럽게 넘어가세요. 학습자가 답을 못 했으면 더 쉬운 질문으로 바꾸세요. 레벨 ${level}에 맞는 어휘와 길이로.
-ko: reply와 next의 한국어 뜻. hint: next에 대한 레벨 ${level} 영어 답변 예시 1~2문장.`,
-        `{"verdict":"ok|minor|wrong|skip","fix":"","tip":"","reply":"","next":"","ko":"","hint":""}`);
+ko: reply와 next의 한국어 뜻. hint: next에 대한 레벨 ${level} 영어 답변 예시 1~2문장.
+4) 공부용 표현 해설. words: reply와 next에 나온 숙어, 구동사, 연어나 레벨 ${level} 학습자가 익혀 둘 만한 단어 2~4개. mywords: 학습자 답과 고친 문장(fix)에 나온 표현 가운데 익혀 둘 만한 숙어나 단어 0~3개(고친 부분의 표현을 우선). en은 문장에 나온 그대로의 표현, ko는 이 문맥에서의 한국어 뜻, note는 쓰임이나 비슷한 표현을 한국어 한 줄로. I, go, like처럼 레벨에 비해 너무 쉬운 단어는 빼세요.`,
+        `{"verdict":"ok|minor|wrong|skip","fix":"","tip":"","reply":"","next":"","ko":"","hint":"","words":[{"en":"","ko":"","note":""}],"mywords":[{"en":"","ko":"","note":""}]}`);
       const verdict = !answer ? "skip" : VERDICTS.includes(r?.verdict) ? r.verdict : "minor";
-      return { verdict, fix: str(r?.fix), tip: str(r?.tip), reply: str(r?.reply), ...question(r) };
+      return { verdict, fix: str(r?.fix), tip: str(r?.tip), reply: str(r?.reply), mywords: words(r?.mywords), ...question(r) };
     },
 
     async askAbout(item, history) {

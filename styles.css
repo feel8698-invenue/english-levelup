@@ -130,4 +130,10 @@ textarea:focus,input:focus{border-color:var(--accent);outline:none;box-shadow:0 
 .bubble.me.en{font-size:15.5px}
 .corr{align-self:flex-end;max-width:92%;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
 .corr.ok{color:var(--ok);border:0;background:none;padding:0 4px}
+.term{background:var(--accent-soft);color:inherit;border-radius:4px;padding:0 2px;text-decoration:underline dotted var(--accent);text-decoration-thickness:2px;text-underline-offset:3px}
+button.term{font-family:var(--f-en);font-size:14.5px;font-weight:500;border:0;cursor:pointer;flex-shrink:0}
+.vocab{display:flex;flex-direction:column;gap:6px;margin-top:10px;padding-top:8px;border-top:1px dashed var(--line);font-family:var(--f-body)}
+.vrow{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;font-size:14px;line-height:1.45}
+.vko{min-width:0;overflow-wrap:anywhere}
+.corr .vocab{margin-top:0;padding-top:0;border-top:0}
 [hidden]{display:none!important}
