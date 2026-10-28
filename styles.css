@@ -111,7 +111,7 @@ textarea:focus,input:focus{border-color:var(--accent);outline:none;box-shadow:0 
 .bubble.ai{align-self:flex-start;background:var(--bg);border:1px solid var(--line)}
 .note{background:var(--accent-soft);border-radius:12px;padding:12px;font-size:14px}
 .warn{background:var(--speak-soft);border-radius:12px;padding:12px;font-size:14px}
-.tabs{position:fixed;left:0;right:0;bottom:0;z-index:10;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));background:var(--surface);border-top:1px solid var(--line);
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:10;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:var(--surface);border-top:1px solid var(--line);
   padding:6px max(8px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px))}
 .tabs button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:52px;border:0;background:none;font-size:12px;color:var(--muted)}
 .tabs button[aria-current="page"]{color:var(--accent);font-weight:700}
@@ -124,4 +124,10 @@ textarea:focus,input:focus{border-color:var(--accent);outline:none;box-shadow:0 
 .trend i.pass{background:var(--accent)}
 .trend span{font-family:var(--f-en);font-size:12px;color:var(--muted)}
 .trendx{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:8px;text-align:center;font-size:11.5px;color:var(--muted);line-height:1.35}
+.chat{display:flex;flex-direction:column;gap:10px}
+.bubble.coach{font-size:16px;line-height:1.55;max-width:96%}
+.bubble.coach b{font-weight:600}
+.bubble.me.en{font-size:15.5px}
+.corr{align-self:flex-end;max-width:92%;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.corr.ok{color:var(--ok);border:0;background:none;padding:0 4px}
 [hidden]{display:none!important}
