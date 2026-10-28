@@ -149,7 +149,7 @@ textarea:focus,input:focus{border-color:var(--accent);outline:none;box-shadow:0 
 <div id="toast" class="toast" role="status" hidden></div>
 <script type="module">
 const SP = (() => {
-// Listening (speech synthesis) and speaking (speech recognition) helpers.
+// English speech synthesis for listening.
 
 const synth = window.speechSynthesis;
 
@@ -164,18 +164,38 @@ function pickVoice(accent) {
 
 function canSpeak() { return !!synth; }
 
+// iOS only lets a page start speech from a tap. Speaking a silent utterance inside the first tap
+// unlocks it, so questions that arrive later (after Claude answers) can be read aloud.
+let unlocked = false;
+function unlock() {
+  if (!synth || unlocked) return;
+  unlocked = true;
+  const u = new SpeechSynthesisUtterance(" ");
+  u.volume = 0;
+  synth.speak(u);
+}
+
+// Resolves "ended", "error" or "silent" (nothing started within a few seconds: speech is blocked here)
+let current = null;
 function speak(text, { accent = "US", rate = 1 } = {}) {
   return new Promise(resolve => {
-    if (!synth) return resolve(false);
-    synth.cancel();
+    if (!synth) return resolve("silent");
+    const busy = synth.speaking || synth.pending;
+    if (busy) synth.cancel();
     const u = new SpeechSynthesisUtterance(text);
     const v = pickVoice(accent);
     if (v) u.voice = v;
     u.lang = v?.lang || (accent === "GB" ? "en-GB" : "en-US");
     u.rate = rate;
-    u.onend = () => resolve(true);
-    u.onerror = () => resolve(false);
-    synth.speak(u);
+    let started = false;
+    const timer = setTimeout(() => { if (!started) resolve("silent"); }, 4000);
+    u.onstart = () => { started = true; };
+    u.onend = () => { clearTimeout(timer); resolve("ended"); };
+    u.onerror = e => { clearTimeout(timer); resolve(e.error === "interrupted" || e.error === "canceled" ? "ended" : "error"); };
+    current = u; // keep a reference so the utterance isn't collected before it ends
+    // speaking right after cancel() is silently dropped by some engines
+    const go = () => { synth.resume(); synth.speak(u); };
+    busy ? setTimeout(go, 120) : go();
   });
 }
 
@@ -184,66 +204,7 @@ function stopSpeaking() { synth?.cancel(); }
 // Some browsers load voices late
 if (synth && synth.onvoiceschanged !== undefined) synth.onvoiceschanged = () => {};
 
-const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-function canListen() { return false; }
-
-// Start listening; onUpdate gets the running transcript. Returns a stop() function.
-// done({text, confidence}) fires once when recognition ends.
-function listen({ accent = "US", onUpdate, done }) {
-  if (!Recognition) { done({ text: "", confidence: 0, error: "unsupported" }); return () => {}; }
-  const rec = new Recognition();
-  rec.lang = accent === "GB" ? "en-GB" : "en-US";
-  rec.interimResults = true;
-  rec.continuous = true;
-  rec.maxAlternatives = 1;
-  let finalText = "", confSum = 0, confN = 0, finished = false, error = null;
-  rec.onresult = e => {
-    let interim = "";
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      const r = e.results[i];
-      if (r.isFinal) {
-        finalText += (finalText ? " " : "") + r[0].transcript.trim();
-        if (r[0].confidence > 0) { confSum += r[0].confidence; confN++; }
-      } else interim += r[0].transcript;
-    }
-    onUpdate?.((finalText + " " + interim).trim());
-  };
-  rec.onerror = e => { error = e.error; };
-  rec.onend = () => {
-    if (finished) return;
-    finished = true;
-    done({ text: finalText.trim(), confidence: confN ? confSum / confN : 0, error });
-  };
-  try { rec.start(); } catch (e) { finished = true; done({ text: "", confidence: 0, error: "start_failed" }); }
-  return () => { try { rec.stop(); } catch (e) {} };
-}
-
-// Word-level comparison for read-aloud: which target words were heard
-const words = s => s.toLowerCase().replace(/[’']/g, "'").replace(/[^a-z0-9' ]/g, " ").split(/\s+/).filter(Boolean);
-function compareReading(target, heard) {
-  const t = words(target), h = words(heard);
-  // longest common subsequence keeps word order
-  const dp = Array.from({ length: t.length + 1 }, () => new Array(h.length + 1).fill(0));
-  for (let i = t.length - 1; i >= 0; i--)
-    for (let j = h.length - 1; j >= 0; j--)
-      dp[i][j] = t[i] === h[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
-  const hit = new Array(t.length).fill(false);
-  for (let i = 0, j = 0; i < t.length && j < h.length;) {
-    if (t[i] === h[j]) { hit[i] = true; i++; j++; }
-    else if (dp[i + 1][j] >= dp[i][j + 1]) i++; else j++;
-  }
-  const score = t.length ? Math.round(hit.filter(Boolean).length / t.length * 100) : 0;
-  // map back onto the original tokens so punctuation and case stay readable
-  let k = 0;
-  const display = target.split(/\s+/).map(tok => {
-    const n = words(tok).length, ok = hit.slice(k, k + n).every(Boolean);
-    k += n;
-    return { tok, ok };
-  });
-  return { score, display, missed: t.filter((w, i) => !hit[i]) };
-}
-
-return { canSpeak, speak, stopSpeaking, canListen, listen, compareReading };
+return { canSpeak, speak, stopSpeaking, unlock };
 })();
 
 // Claude calls through the artifact's sample capability (the viewer's own Claude account).
@@ -421,7 +382,14 @@ const hasKey = () => !!sampleCap;
 const HANGUL = /[ᄀ-ᇿ㄰-㆏가-힯]/;
 let toastTimer;
 function toast(msg) { const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => t.hidden = true, 3200); }
-const say = text => SP.speak(plain(text), { accent: state.settings.accent, rate: state.settings.rate });
+let speechWarned = false;
+async function say(text) {
+  const r = await SP.speak(plain(text), { accent: state.settings.accent, rate: state.settings.rate });
+  if (r !== "ended" && !speechWarned) {
+    speechWarned = true;
+    toast(SP.canSpeak() ? "음성이 재생되지 않았어요. 듣기 버튼을 눌러 보고, 그래도 안 나오면 무음 모드와 음량을 확인해 주세요." : "이 화면에서는 영어 음성을 재생할 수 없어요.");
+  }
+}
 const answered = chat => chat.turns.filter(t => t.a != null);
 
 const ICON = {
@@ -707,9 +675,10 @@ document.addEventListener("input", e => {
   if (e.target.id === "answer") { ui.draft = e.target.value; const w = $("#kowarn"); if (w) w.hidden = !HANGUL.test(ui.draft); }
 });
 document.addEventListener("keydown", e => {
-  if (e.target.id === "answer" && e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendAnswer(e.target.value); }
+  if (e.target.id === "answer" && e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); SP.unlock(); sendAnswer(e.target.value); }
 });
 document.addEventListener("click", e => {
+  SP.unlock();
   const b = e.target.closest("[data-act]");
   if (!b || b.disabled) return;
   switch (b.dataset.act) {

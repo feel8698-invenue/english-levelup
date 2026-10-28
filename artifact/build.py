@@ -2,10 +2,7 @@
 import re, sys
 repo, here, out = sys.argv[1], sys.argv[2], sys.argv[3]
 speech = open(f"{repo}/speech.js").read().replace("export function", "function")
-# the artifact frame refuses the microphone, so answers come from keyboard dictation
-speech = speech.replace("export function canListen() { return !!Recognition; }", "")
-speech = speech.replace("function canListen() { return !!Recognition; }", "function canListen() { return false; }")
-speech = "const SP = (() => {\n" + speech + "\nreturn { canSpeak, speak, stopSpeaking, canListen, listen, compareReading };\n})();\n"
+speech = "const SP = (() => {\n" + speech + "\nreturn { canSpeak, speak, stopSpeaking, unlock };\n})();\n"
 ai = open(f"{here}/ai-sample.js").read()
 app = open(f"{here}/app.js").read()
 css = open(f"{repo}/styles.css").read()

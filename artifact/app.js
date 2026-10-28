@@ -95,7 +95,14 @@ const hasKey = () => !!sampleCap;
 const HANGUL = /[ᄀ-ᇿ㄰-㆏가-힯]/;
 let toastTimer;
 function toast(msg) { const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => t.hidden = true, 3200); }
-const say = text => SP.speak(plain(text), { accent: state.settings.accent, rate: state.settings.rate });
+let speechWarned = false;
+async function say(text) {
+  const r = await SP.speak(plain(text), { accent: state.settings.accent, rate: state.settings.rate });
+  if (r !== "ended" && !speechWarned) {
+    speechWarned = true;
+    toast(SP.canSpeak() ? "음성이 재생되지 않았어요. 듣기 버튼을 눌러 보고, 그래도 안 나오면 무음 모드와 음량을 확인해 주세요." : "이 화면에서는 영어 음성을 재생할 수 없어요.");
+  }
+}
 const answered = chat => chat.turns.filter(t => t.a != null);
 
 const ICON = {
@@ -381,9 +388,10 @@ document.addEventListener("input", e => {
   if (e.target.id === "answer") { ui.draft = e.target.value; const w = $("#kowarn"); if (w) w.hidden = !HANGUL.test(ui.draft); }
 });
 document.addEventListener("keydown", e => {
-  if (e.target.id === "answer" && e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendAnswer(e.target.value); }
+  if (e.target.id === "answer" && e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); SP.unlock(); sendAnswer(e.target.value); }
 });
 document.addEventListener("click", e => {
+  SP.unlock();
   const b = e.target.closest("[data-act]");
   if (!b || b.disabled) return;
   switch (b.dataset.act) {
