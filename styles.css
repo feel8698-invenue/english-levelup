@@ -132,7 +132,12 @@ textarea:focus,input:focus{border-color:var(--accent);outline:none;box-shadow:0 
 .corr.ok{color:var(--ok);border:0;background:none;padding:0 4px}
 .term{background:var(--accent-soft);color:inherit;border-radius:4px;padding:0 2px;text-decoration:underline dotted var(--accent);text-decoration-thickness:2px;text-underline-offset:3px}
 button.term{font-family:var(--f-en);font-size:14.5px;font-weight:500;border:0;cursor:pointer;flex-shrink:0}
-.vocab{display:flex;flex-direction:column;gap:6px;margin-top:10px;padding-top:8px;border-top:1px dashed var(--line);font-family:var(--f-body)}
+.vocab{display:flex;flex-direction:column;gap:6px;margin-top:10px;padding-top:4px;border-top:1px dashed var(--line);font-family:var(--f-body)}
+.vocab>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px;min-height:32px;-webkit-tap-highlight-color:transparent}
+.vocab>summary::-webkit-details-marker{display:none}
+.vocab>summary::after{content:"";width:7px;height:7px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg) translateY(-2px);transition:transform .15s}
+.vocab[open]>summary::after{transform:rotate(-135deg) translate(-2px,0)}
+@media (prefers-reduced-motion: reduce){.vocab>summary::after{transition:none}}
 .vrow{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;font-size:14px;line-height:1.45}
 .vko{min-width:0;overflow-wrap:anywhere}
 .corr .vocab{margin-top:0;padding-top:0;border-top:0}

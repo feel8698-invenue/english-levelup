@@ -78,7 +78,7 @@ async function connect() {
 }
 
 // ---------- ui state (not saved) ----------
-const ui = { view: "home", draft: "", busy: false, ko: new Set(), hint: false, summary: null,
+const ui = { view: "home", draft: "", busy: false, ko: new Set(), vopen: new Set(), hint: false, summary: null,
   askOpen: null, askBusy: false, detail: null, confirmReset: false };
 
 // ---------- helpers ----------
@@ -333,9 +333,9 @@ function turnView(t, key, live) {
       ${t.ko ? `<button class="chip" data-act="ko" data-k="${key}" aria-pressed="${open}">뜻</button>` : ""}
     </div>
     ${open ? `<p class="small" style="font-family:var(--f-body);margin-top:6px">${esc(t.ko)}</p>` : ""}
-    ${vocabView(t.words)}
+    ${vocabView(t.words, `${key}w`)}
   </div>
-  ${t.a != null ? `<div class="bubble me en">${hl(t.a || "(모르겠어요)", t.mywords)}</div>${t.verdict ? corrView(t) : ""}${t.mywords?.length ? `<div class="corr">${vocabView(t.mywords)}</div>` : ""}` : ""}`;
+  ${t.a != null ? `<div class="bubble me en">${hl(t.a || "(모르겠어요)", t.mywords)}</div>${t.verdict ? corrView(t) : ""}${t.mywords?.length ? `<div class="corr">${vocabView(t.mywords, `${key}m`)}</div>` : ""}` : ""}`;
 }
 
 // Underline the annotated idioms and words inside a sentence (longest first, case-insensitive)
@@ -347,11 +347,12 @@ function hl(text, words) {
   for (const m of String(text).matchAll(re)) { out += esc(text.slice(at, m.index)) + `<span class="term">${esc(m[0])}</span>`; at = m.index + m[0].length; }
   return out + esc(text.slice(at));
 }
-function vocabView(words) {
+// Collapsed by default; ui.vopen remembers which ones are open across re-renders
+function vocabView(words, key) {
   if (!words?.length) return "";
-  return `<div class="vocab"><span class="label">단어 · 숙어</span>${words.map(w => `
+  return `<details class="vocab" data-k="${key}" ${ui.vopen.has(key) ? "open" : ""}><summary><span class="label">단어 · 숙어 ${words.length}개</span></summary>${words.map(w => `
     <div class="vrow"><button class="term" data-act="say" data-text="${esc(w.en)}">${esc(w.en)}</button>
-      <span class="vko">${esc(w.ko)}${w.note ? `<span class="muted"> · ${esc(w.note)}</span>` : ""}</span></div>`).join("")}</div>`;
+      <span class="vko">${esc(w.ko)}${w.note ? `<span class="muted"> · ${esc(w.note)}</span>` : ""}</span></div>`).join("")}</details>`;
 }
 function corrView(t) {
   if (t.verdict === "ok") return `<p class="corr ok small">○ 자연스러워요</p>`;
@@ -404,6 +405,10 @@ async function ask(q) {
 document.addEventListener("input", e => {
   if (e.target.id === "answer") { ui.draft = e.target.value; const w = $("#kowarn"); if (w) w.hidden = !HANGUL.test(ui.draft); }
 });
+document.addEventListener("toggle", e => {
+  const d = e.target;
+  if (d.classList?.contains("vocab")) d.open ? ui.vopen.add(d.dataset.k) : ui.vopen.delete(d.dataset.k);
+}, true);
 document.addEventListener("keydown", e => {
   if (e.target.id === "answer" && e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); SP.unlock(); sendAnswer(e.target.value); }
 });
